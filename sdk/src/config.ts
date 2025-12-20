@@ -20,14 +20,14 @@ export interface FrySwapConfig {
 }
 
 /**
- * Mainnet configuration (placeholder - update after deployment)
+ * Mainnet configuration (using Nodely endpoints)
  */
 export const MAINNET_CONFIG: FrySwapConfig = {
   network: {
-    algodServer: 'https://mainnet-api.algonode.cloud',
+    algodServer: 'https://mainnet-api.4160.nodely.dev',
     algodPort: 443,
     algodToken: '',
-    indexerServer: 'https://mainnet-idx.algonode.cloud',
+    indexerServer: 'https://mainnet-idx.4160.nodely.dev',
     indexerPort: 443,
     indexerToken: '',
   },
@@ -36,14 +36,14 @@ export const MAINNET_CONFIG: FrySwapConfig = {
 };
 
 /**
- * Testnet configuration (placeholder - update after deployment)
+ * Testnet configuration (using Nodely endpoints)
  */
 export const TESTNET_CONFIG: FrySwapConfig = {
   network: {
-    algodServer: 'https://testnet-api.algonode.cloud',
+    algodServer: 'https://testnet-api.4160.nodely.dev',
     algodPort: 443,
     algodToken: '',
-    indexerServer: 'https://testnet-idx.algonode.cloud',
+    indexerServer: 'https://testnet-idx.4160.nodely.dev',
     indexerPort: 443,
     indexerToken: '',
   },

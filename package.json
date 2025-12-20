@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/*",
     "api",
-    "sdk"
+    "sdk",
+    "web"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
@@ -15,7 +16,9 @@
     "format": "prettier --write .",
     "api:dev": "npm run dev --workspace=api",
     "api:start": "npm run start --workspace=api",
-    "sdk:build": "npm run build --workspace=@fryswap/sdk"
+    "sdk:build": "npm run build --workspace=@fryswap/sdk",
+    "web:dev": "npm run dev --workspace=@fryswap/web",
+    "web:build": "npm run build --workspace=@fryswap/web"
   },
   "keywords": [
     "dex",

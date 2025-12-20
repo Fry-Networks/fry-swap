@@ -17,6 +17,7 @@ fryswap/
 ├── contracts/       # Smart contracts (PyTeal for Algorand)
 ├── api/            # REST API service
 ├── sdk/            # TypeScript SDK
+├── web/            # React frontend (Vite + TailwindCSS)
 └── packages/       # Shared utilities
 ```
 
@@ -26,7 +27,7 @@ fryswap/
 
 - Node.js >= 18
 - Python >= 3.10 (for contracts)
-- An Algorand node or access to AlgoNode
+- Algorand node access (uses Nodely by default)
 
 ### Installation
 
@@ -56,6 +57,18 @@ npm run api:start
 ```
 
 The API will be available at `http://localhost:3000`.
+
+### Running the Web UI
+
+```bash
+# Development
+npm run web:dev
+
+# Production build
+npm run web:build
+```
+
+The web UI will be available at `http://localhost:5173`.
 
 ## API Endpoints
 
@@ -150,11 +163,11 @@ Compiled TEAL files will be in `contracts/build/`.
 PORT=3000
 NODE_ENV=development
 
-# Algorand Network
+# Algorand Network (using Nodely)
 ALGORAND_NETWORK=testnet
-ALGOD_SERVER=https://testnet-api.algonode.cloud
+ALGOD_SERVER=https://testnet-api.4160.nodely.dev
 ALGOD_PORT=443
-INDEXER_SERVER=https://testnet-idx.algonode.cloud
+INDEXER_SERVER=https://testnet-idx.4160.nodely.dev
 INDEXER_PORT=443
 
 # Contract IDs (set after deployment)
@@ -169,6 +182,7 @@ ROUTER_APP_ID=0
 - **contracts/**: PyTeal smart contracts for Algorand
 - **api/**: Express.js REST API
 - **sdk/**: TypeScript SDK for developers
+- **web/**: React frontend with TailwindCSS
 
 ### Running Tests
 
@@ -201,6 +215,7 @@ npm run format
 - [x] Core AMM contracts (Pool, Factory, Router)
 - [x] REST API with free public endpoints
 - [x] TypeScript SDK
+- [x] Web UI with wallet integration
 - [ ] Mainnet deployment
 - [ ] Multi-hop routing optimization
 - [ ] Concentrated liquidity pools
@@ -215,5 +230,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - Website: https://fryswap.com (coming soon)
 - Documentation: https://docs.fryswap.com (coming soon)
-- Twitter: @FrySwap
-- Discord: discord.gg/fryswap
+- Twitter: @FryNetworks
+- Discord: discord.gg/frynetworks
+
+---
+
+Built with love by **Fry Networks**
