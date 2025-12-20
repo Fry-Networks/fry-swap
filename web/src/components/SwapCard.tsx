@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { useSwapStore } from '../store/swap';
-import { formatTokenAmount } from '../config/tokens';
+import { formatTokenAmount, FRY, FRY_FEE_ADDRESS } from '../config/tokens';
 import { getAssetBalance } from '../services/algorand';
 import TokenSelector from './TokenSelector';
 import TokenInput from './TokenInput';
@@ -30,6 +30,7 @@ export default function SwapCard() {
   const [selectingToken, setSelectingToken] = useState<'in' | 'out' | null>(null);
   const [balanceIn, setBalanceIn] = useState<string>('');
   const [balanceOut, setBalanceOut] = useState<string>('');
+  const [fryBalance, setFryBalance] = useState<bigint>(0n);
   const [swapping, setSwapping] = useState(false);
 
   // Fetch balances when account or tokens change
@@ -37,6 +38,7 @@ export default function SwapCard() {
     if (!activeAccount) {
       setBalanceIn('');
       setBalanceOut('');
+      setFryBalance(0n);
       return;
     }
 
@@ -49,6 +51,10 @@ export default function SwapCard() {
           const balOut = await getAssetBalance(activeAccount.address, tokenOut.id);
           setBalanceOut(formatTokenAmount(balOut, tokenOut.decimals));
         }
+
+        // Fetch FRY balance for fee payment
+        const fryBal = await getAssetBalance(activeAccount.address, FRY.id);
+        setFryBalance(fryBal);
       } catch (err) {
         console.error('Failed to fetch balances:', err);
       }
@@ -85,6 +91,11 @@ export default function SwapCard() {
 
   const isValidSwap = tokenIn && tokenOut && amountIn && parseFloat(amountIn) > 0 && quote;
   const priceImpactWarning = quote && quote.priceImpact > 0.05; // > 5%
+
+  // Check if user has enough FRY for the fee
+  const fryFeeAmount = quote?.fryFee ? BigInt(quote.fryFee.amount) : 0n;
+  const hasSufficientFry = fryBalance >= fryFeeAmount;
+  const fryBalanceFormatted = formatTokenAmount(fryBalance, FRY.decimals);
 
   return (
     <>
@@ -201,6 +212,35 @@ export default function SwapCard() {
               <span>Network Fee</span>
               <span>~0.002 ALGO</span>
             </div>
+            {/* FRY Fee */}
+            <div className="flex justify-between items-center border-t border-surface-lighter pt-2 mt-2">
+              <span className="text-gray-400">Platform Fee (FRY)</span>
+              <div className="text-right">
+                <span className={!hasSufficientFry ? 'text-red-400' : 'text-primary-400'}>
+                  {quote.fryFee.amountFormatted} FRY
+                </span>
+                {quote.fryFee.usdValue > 0 && (
+                  <span className="text-gray-500 text-xs ml-1">
+                    (~${quote.fryFee.usdValue.toFixed(4)})
+                  </span>
+                )}
+              </div>
+            </div>
+            {activeAccount && (
+              <div className="flex justify-between text-gray-500 text-xs">
+                <span>Your FRY Balance</span>
+                <span className={!hasSufficientFry ? 'text-red-400' : ''}>
+                  {fryBalanceFormatted} FRY
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Insufficient FRY Warning */}
+        {quote && activeAccount && !hasSufficientFry && (
+          <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-400 text-sm">
+            Insufficient FRY balance for platform fee. You need {quote.fryFee.amountFormatted} FRY but have {fryBalanceFormatted} FRY.
           </div>
         )}
 
@@ -214,7 +254,7 @@ export default function SwapCard() {
         {/* Swap Button */}
         <button
           onClick={handleSwap}
-          disabled={!activeAccount || !isValidSwap || swapping}
+          disabled={!activeAccount || !isValidSwap || swapping || !hasSufficientFry}
           className="btn-primary w-full mt-6 py-4 text-lg disabled:opacity-50"
         >
           {swapping ? (
@@ -245,6 +285,8 @@ export default function SwapCard() {
             'Enter an amount'
           ) : loading ? (
             'Fetching quote...'
+          ) : !hasSufficientFry && quote ? (
+            'Insufficient FRY for fee'
           ) : (
             'Swap'
           )}

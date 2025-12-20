@@ -51,6 +51,13 @@ swapRouter.get('/quote', async (req, res, next) => {
         fee: quote.fee.toString(),
         route: quote.route,
         poolIds: quote.poolIds,
+        fryFee: {
+          amount: quote.fryFee.amount.toString(),
+          amountFormatted: quote.fryFee.amountFormatted,
+          feeAddress: quote.fryFee.feeAddress,
+          fryTokenId: quote.fryFee.fryTokenId,
+          usdValue: quote.fryFee.usdValue,
+        },
       },
     });
   } catch (error) {
@@ -88,6 +95,13 @@ swapRouter.post('/quote', async (req, res, next) => {
         fee: quote.fee.toString(),
         route: quote.route,
         poolIds: quote.poolIds,
+        fryFee: {
+          amount: quote.fryFee.amount.toString(),
+          amountFormatted: quote.fryFee.amountFormatted,
+          feeAddress: quote.fryFee.feeAddress,
+          fryTokenId: quote.fryFee.fryTokenId,
+          usdValue: quote.fryFee.usdValue,
+        },
       },
     });
   } catch (error) {
@@ -123,6 +137,13 @@ swapRouter.get('/route', async (req, res, next) => {
         fee: route.fee.toString(),
         path: route.route,
         poolIds: route.poolIds,
+        fryFee: {
+          amount: route.fryFee.amount.toString(),
+          amountFormatted: route.fryFee.amountFormatted,
+          feeAddress: route.fryFee.feeAddress,
+          fryTokenId: route.fryFee.fryTokenId,
+          usdValue: route.fryFee.usdValue,
+        },
       },
     });
   } catch (error) {

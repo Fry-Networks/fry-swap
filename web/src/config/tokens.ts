@@ -24,11 +24,29 @@ export const ALGO: Token = {
 };
 
 /**
+ * FRY Token - Used for platform fees
+ */
+export const FRY: Token = {
+  id: 2485314946,
+  symbol: 'FRY',
+  name: 'FRY Token',
+  decimals: 6,
+  logo: '/tokens/fry.svg',
+  verified: true,
+};
+
+/**
+ * FRY Fee Configuration
+ */
+export const FRY_FEE_ADDRESS = 'E2F2LT2INE75DBOYHQXTCTOP2PAP5MHAXQRXTTCCXFKHQTVG36DJONBQZE';
+
+/**
  * Popular mainnet tokens
  * ASA IDs from Algorand mainnet
  */
 export const MAINNET_TOKENS: Token[] = [
   ALGO,
+  FRY,
   {
     id: 31566704,
     symbol: 'USDC',
