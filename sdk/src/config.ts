@@ -63,3 +63,8 @@ export function createConfig(
     ...partial,
   };
 }
+
+/**
+ * Default configuration (mainnet)
+ */
+export const DEFAULT_CONFIG = MAINNET_CONFIG;

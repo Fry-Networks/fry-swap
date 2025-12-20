@@ -161,13 +161,13 @@ Compiled TEAL files will be in `contracts/build/`.
 ```bash
 # API Configuration
 PORT=3000
-NODE_ENV=development
+NODE_ENV=production
 
-# Algorand Network (using Nodely)
-ALGORAND_NETWORK=testnet
-ALGOD_SERVER=https://testnet-api.4160.nodely.dev
+# Algorand Network (using Nodely - Mainnet)
+ALGORAND_NETWORK=mainnet
+ALGOD_SERVER=https://mainnet-api.4160.nodely.dev
 ALGOD_PORT=443
-INDEXER_SERVER=https://testnet-idx.4160.nodely.dev
+INDEXER_SERVER=https://mainnet-idx.4160.nodely.dev
 INDEXER_PORT=443
 
 # Contract IDs (set after deployment)

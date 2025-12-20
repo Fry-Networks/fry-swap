@@ -1,12 +1,5 @@
 import { ChevronDownIcon } from './Icons';
-
-interface Token {
-  id: number;
-  symbol: string;
-  name: string;
-  decimals: number;
-  logo?: string;
-}
+import { Token } from '../config/tokens';
 
 interface TokenInputProps {
   label: string;
@@ -16,6 +9,7 @@ interface TokenInputProps {
   onTokenSelect: () => void;
   balance?: string;
   readonly?: boolean;
+  loading?: boolean;
 }
 
 export default function TokenInput({
@@ -26,6 +20,7 @@ export default function TokenInput({
   onTokenSelect,
   balance,
   readonly = false,
+  loading = false,
 }: TokenInputProps) {
   return (
     <div className="swap-input">
@@ -34,30 +29,38 @@ export default function TokenInput({
         {balance && (
           <span className="text-sm text-gray-400">
             Balance: {balance}
-            <button
-              onClick={() => onAmountChange(balance)}
-              className="ml-2 text-primary-500 hover:text-primary-400"
-            >
-              MAX
-            </button>
+            {!readonly && (
+              <button
+                onClick={() => onAmountChange(balance.replace(/,/g, ''))}
+                className="ml-2 text-primary-500 hover:text-primary-400"
+              >
+                MAX
+              </button>
+            )}
           </span>
         )}
       </div>
 
       <div className="flex items-center gap-3">
-        <input
-          type="text"
-          value={amount}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (/^\d*\.?\d*$/.test(value)) {
-              onAmountChange(value);
-            }
-          }}
-          placeholder="0.00"
-          readOnly={readonly}
-          className="flex-1 bg-transparent text-2xl font-medium outline-none placeholder:text-gray-600"
-        />
+        {loading ? (
+          <div className="flex-1 flex items-center">
+            <div className="animate-pulse bg-surface-lighter h-8 w-32 rounded" />
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={amount}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (/^\d*\.?\d*$/.test(value)) {
+                onAmountChange(value);
+              }
+            }}
+            placeholder="0.00"
+            readOnly={readonly}
+            className="flex-1 bg-transparent text-2xl font-medium outline-none placeholder:text-gray-600"
+          />
+        )}
 
         <button
           onClick={onTokenSelect}
@@ -77,9 +80,9 @@ export default function TokenInput({
         </button>
       </div>
 
-      {token && amount && (
+      {token && amount && parseFloat(amount) > 0 && (
         <div className="mt-2 text-sm text-gray-500">
-          ≈ $0.00
+          {/* Price in USD would come from price feed */}
         </div>
       )}
     </div>

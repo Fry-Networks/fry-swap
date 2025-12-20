@@ -6,13 +6,13 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
 
-  // Algorand configuration (using Nodely endpoints)
-  algorandNetwork: process.env.ALGORAND_NETWORK || 'testnet',
-  algodServer: process.env.ALGOD_SERVER || 'https://testnet-api.4160.nodely.dev',
+  // Algorand configuration (using Nodely mainnet endpoints)
+  algorandNetwork: process.env.ALGORAND_NETWORK || 'mainnet',
+  algodServer: process.env.ALGOD_SERVER || 'https://mainnet-api.4160.nodely.dev',
   algodPort: parseInt(process.env.ALGOD_PORT || '443', 10),
   algodToken: process.env.ALGOD_TOKEN || '',
 
-  indexerServer: process.env.INDEXER_SERVER || 'https://testnet-idx.4160.nodely.dev',
+  indexerServer: process.env.INDEXER_SERVER || 'https://mainnet-idx.4160.nodely.dev',
   indexerPort: parseInt(process.env.INDEXER_PORT || '443', 10),
   indexerToken: process.env.INDEXER_TOKEN || '',
 
