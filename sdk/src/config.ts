@@ -1,0 +1,65 @@
+/**
+ * Network configuration
+ */
+export interface NetworkConfig {
+  algodServer: string;
+  algodPort: number;
+  algodToken: string;
+  indexerServer: string;
+  indexerPort: number;
+  indexerToken: string;
+}
+
+/**
+ * FrySwap configuration
+ */
+export interface FrySwapConfig {
+  network: NetworkConfig;
+  factoryAppId: number;
+  routerAppId: number;
+}
+
+/**
+ * Mainnet configuration (placeholder - update after deployment)
+ */
+export const MAINNET_CONFIG: FrySwapConfig = {
+  network: {
+    algodServer: 'https://mainnet-api.algonode.cloud',
+    algodPort: 443,
+    algodToken: '',
+    indexerServer: 'https://mainnet-idx.algonode.cloud',
+    indexerPort: 443,
+    indexerToken: '',
+  },
+  factoryAppId: 0, // Set after deployment
+  routerAppId: 0, // Set after deployment
+};
+
+/**
+ * Testnet configuration (placeholder - update after deployment)
+ */
+export const TESTNET_CONFIG: FrySwapConfig = {
+  network: {
+    algodServer: 'https://testnet-api.algonode.cloud',
+    algodPort: 443,
+    algodToken: '',
+    indexerServer: 'https://testnet-idx.algonode.cloud',
+    indexerPort: 443,
+    indexerToken: '',
+  },
+  factoryAppId: 0, // Set after deployment
+  routerAppId: 0, // Set after deployment
+};
+
+/**
+ * Create custom configuration
+ */
+export function createConfig(
+  partial: Partial<FrySwapConfig> & { network: NetworkConfig }
+): FrySwapConfig {
+  return {
+    factoryAppId: 0,
+    routerAppId: 0,
+    ...partial,
+  };
+}
