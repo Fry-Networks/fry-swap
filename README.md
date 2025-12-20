@@ -154,6 +154,47 @@ python scripts/compile.py
 
 Compiled TEAL files will be in `contracts/build/`.
 
+### Deploying Contracts
+
+#### Using PowerShell (Recommended)
+
+The easiest way to deploy is using our interactive PowerShell script:
+
+```powershell
+# Windows/PowerShell
+.\deploy.ps1
+
+# Compile only (no deployment)
+.\deploy.ps1 -CompileOnly
+
+# Deploy with a specific pool
+.\deploy.ps1 -DeployPool -AssetA 0 -AssetB 31566704
+```
+
+#### Using Python Directly
+
+```bash
+cd contracts
+source venv/bin/activate
+
+# Compile only
+python scripts/deploy.py --compile-only
+
+# Full deployment
+python scripts/deploy.py --mnemonic "your 25 word mnemonic here"
+
+# Deploy with a pool (e.g., ALGO/USDC)
+python scripts/deploy.py --mnemonic "..." --deploy-pool --asset-a 0 --asset-b 31566704
+```
+
+#### Deployment Requirements
+
+- **Algorand account** with at least 5 ALGO
+- **Python 3.10+** with pyteal and py-algorand-sdk
+- **Network access** to Algorand mainnet (uses Nodely endpoints)
+
+After deployment, contract IDs are saved to `contracts/build/deployment.json`.
+
 ## Configuration
 
 ### Environment Variables
