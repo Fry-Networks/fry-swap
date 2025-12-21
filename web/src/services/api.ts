@@ -32,6 +32,14 @@ export interface PoolStats {
   apr: number;
 }
 
+export interface FryFeeInfo {
+  amount: string;
+  amountFormatted: string;
+  feeAddress: string;
+  fryTokenId: number;
+  usdValue: number;
+}
+
 export interface SwapQuote {
   amountIn: string;
   amountOut: string;
@@ -39,6 +47,7 @@ export interface SwapQuote {
   fee: string;
   route: number[];
   poolIds: number[];
+  fryFee: FryFeeInfo;
 }
 
 class FrySwapAPI {

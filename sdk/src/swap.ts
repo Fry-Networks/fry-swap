@@ -3,6 +3,26 @@ import { Pool } from './pool.js';
 import { SigningAccount, TransactionResult } from './types.js';
 import { InvalidParamsError, SlippageExceededError } from './errors.js';
 
+// FRY Token Configuration
+export const FRY_TOKEN_ID = 2485314946;
+export const FRY_FEE_ADDRESS = 'E2F2LT2INE75DBOYHQXTCTOP2PAP5MHAXQRXTTCCXFKHQTVG36DJONBQZE';
+
+/**
+ * FRY fee information for a swap
+ */
+export interface FryFeeInfo {
+  /** Amount of FRY to pay as fee */
+  amount: bigint;
+  /** Human-readable FRY amount */
+  amountFormatted: string;
+  /** Address to send FRY fee to */
+  feeAddress: string;
+  /** FRY ASA ID */
+  fryTokenId: number;
+  /** USD value of the fee */
+  usdValue: number;
+}
+
 /**
  * Parameters for a swap
  */
@@ -19,6 +39,8 @@ export interface SwapParams {
   slippageBps?: number;
   /** Transaction deadline (Unix timestamp) */
   deadline?: number;
+  /** FRY fee info (from API quote) */
+  fryFee?: FryFeeInfo;
 }
 
 /**
@@ -41,6 +63,8 @@ export interface SwapQuote {
   route: number[];
   /** Pool IDs used */
   poolIds: number[];
+  /** FRY fee information */
+  fryFee?: FryFeeInfo;
 }
 
 /**
@@ -103,6 +127,7 @@ export function calculateSwapQuote(
 
 /**
  * Build swap transactions
+ * Includes FRY fee payment transaction if fryFee is provided
  */
 export async function buildSwapTransactions(
   algod: algosdk.Algodv2,
@@ -120,7 +145,21 @@ export async function buildSwapTransactions(
 
   const transactions: algosdk.Transaction[] = [];
 
-  // 1. Asset transfer to pool (payment for swap)
+  // 1. FRY fee payment (if required)
+  if (quote.fryFee && quote.fryFee.amount > 0n) {
+    transactions.push(
+      algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+        sender,
+        receiver: quote.fryFee.feeAddress,
+        assetIndex: quote.fryFee.fryTokenId,
+        amount: quote.fryFee.amount,
+        suggestedParams: params,
+        note: new TextEncoder().encode('FrySwap Platform Fee'),
+      })
+    );
+  }
+
+  // 2. Asset transfer to pool (payment for swap)
   const assetInId = quote.route[0];
   if (assetInId === 0) {
     // ALGO transfer
@@ -145,7 +184,13 @@ export async function buildSwapTransactions(
     );
   }
 
-  // 2. Application call to execute swap
+  // 3. Application call to execute swap
+  const foreignAssets = [quote.route[0], quote.route[1]].filter((id) => id !== 0);
+  // Include FRY token in foreign assets if needed
+  if (quote.fryFee && !foreignAssets.includes(quote.fryFee.fryTokenId)) {
+    foreignAssets.push(quote.fryFee.fryTokenId);
+  }
+
   transactions.push(
     algosdk.makeApplicationCallTxnFromObject({
       sender,
@@ -155,7 +200,7 @@ export async function buildSwapTransactions(
         algosdk.encodeUint64(quote.amountIn),
         algosdk.encodeUint64(quote.minAmountOut),
       ],
-      foreignAssets: [quote.route[0], quote.route[1]].filter((id) => id !== 0),
+      foreignAssets,
       suggestedParams: params,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
     })

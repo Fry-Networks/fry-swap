@@ -1,8 +1,21 @@
 import { Pool, getPoolByAssets } from './pools.js';
 import { ApiError } from '../middleware/error.js';
+import { config } from '../config.js';
+import { getAssetPrice, getValueInUsd, getAlgoUsdPrice } from './vestige.js';
 
 // Fee constants (must match smart contract)
 const SWAP_FEE_BPS = 30; // 0.30%
+
+// FRY token decimals (standard Algorand ASA decimals)
+const FRY_DECIMALS = 6;
+
+export interface FryFeeInfo {
+  amount: bigint; // Amount of FRY to pay as fee
+  amountFormatted: string; // Human-readable FRY amount
+  feeAddress: string; // Address to send FRY fee to
+  fryTokenId: number; // FRY ASA ID
+  usdValue: number; // USD value of the fee
+}
 
 export interface SwapQuote {
   amountIn: bigint;
@@ -11,6 +24,7 @@ export interface SwapQuote {
   fee: bigint;
   route: number[]; // Asset IDs in order
   poolIds: number[]; // Pool app IDs used
+  fryFee: FryFeeInfo; // FRY fee information
 }
 
 export interface SwapParams {
@@ -75,6 +89,65 @@ export function calculatePriceImpact(
 }
 
 /**
+ * Calculate FRY fee for a swap based on the USD value of the swap
+ * Users pay the fee in FRY tokens
+ */
+export async function calculateFryFee(
+  assetInId: number,
+  assetInDecimals: number,
+  amountIn: bigint
+): Promise<FryFeeInfo> {
+  try {
+    // Get the USD value of the swap input
+    const swapValueUsd = await getValueInUsd(assetInId, amountIn, assetInDecimals);
+
+    // Calculate fee in USD (using configured basis points)
+    const feeValueUsd = (swapValueUsd * config.fryFeeBps) / 10000;
+
+    // Get FRY price in USD
+    const { priceUsd: fryPriceUsd } = await getAssetPrice(config.fryTokenId);
+
+    // Calculate FRY amount needed to cover the fee
+    let fryAmount: bigint;
+    if (fryPriceUsd > 0) {
+      const fryAmountFloat = feeValueUsd / fryPriceUsd;
+      fryAmount = BigInt(Math.ceil(fryAmountFloat * Math.pow(10, FRY_DECIMALS)));
+    } else {
+      // Fallback: if we can't get FRY price, use a minimum fee
+      fryAmount = BigInt(1_000_000); // 1 FRY minimum
+    }
+
+    // Ensure minimum fee of 0.01 FRY to cover transaction costs
+    const minFee = BigInt(10_000); // 0.01 FRY
+    if (fryAmount < minFee) {
+      fryAmount = minFee;
+    }
+
+    const amountFormatted = (Number(fryAmount) / Math.pow(10, FRY_DECIMALS)).toFixed(6);
+
+    return {
+      amount: fryAmount,
+      amountFormatted,
+      feeAddress: config.fryFeeAddress,
+      fryTokenId: config.fryTokenId,
+      usdValue: feeValueUsd,
+    };
+  } catch (error) {
+    console.error('Error calculating FRY fee:', error);
+
+    // Return a minimum fee if calculation fails
+    const minFee = BigInt(10_000); // 0.01 FRY
+    return {
+      amount: minFee,
+      amountFormatted: '0.010000',
+      feeAddress: config.fryFeeAddress,
+      fryTokenId: config.fryTokenId,
+      usdValue: 0,
+    };
+  }
+}
+
+/**
  * Get a quote for a swap
  */
 export async function getSwapQuote(params: SwapParams): Promise<SwapQuote> {
@@ -94,6 +167,7 @@ export async function getSwapQuote(params: SwapParams): Promise<SwapQuote> {
   const isAToB = assetIn === pool.assetA.id;
   const reserveIn = isAToB ? pool.reserveA : pool.reserveB;
   const reserveOut = isAToB ? pool.reserveB : pool.reserveA;
+  const assetInInfo = isAToB ? pool.assetA : pool.assetB;
 
   let finalAmountIn: bigint;
   let finalAmountOut: bigint;
@@ -114,6 +188,9 @@ export async function getSwapQuote(params: SwapParams): Promise<SwapQuote> {
     reserveOut
   );
 
+  // Calculate FRY fee based on swap value
+  const fryFee = await calculateFryFee(assetIn, assetInInfo.decimals, finalAmountIn);
+
   return {
     amountIn: finalAmountIn,
     amountOut: finalAmountOut,
@@ -121,6 +198,7 @@ export async function getSwapQuote(params: SwapParams): Promise<SwapQuote> {
     fee,
     route: [assetIn, assetOut],
     poolIds: [pool.appId],
+    fryFee,
   };
 }
 

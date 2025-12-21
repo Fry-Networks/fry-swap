@@ -6,7 +6,7 @@
 
 export { FrySwap } from './client.js';
 export { Pool, PoolInfo } from './pool.js';
-export { SwapQuote, SwapParams, SwapResult } from './swap.js';
+export { SwapQuote, SwapParams, SwapResult, FryFeeInfo, FRY_TOKEN_ID, FRY_FEE_ADDRESS } from './swap.js';
 export { LiquidityParams, LiquidityResult } from './liquidity.js';
 export {
   FrySwapConfig,
