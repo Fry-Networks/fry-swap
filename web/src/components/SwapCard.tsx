@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
+import algosdk from 'algosdk';
 import { useSwapStore } from '../store/swap';
-import { formatTokenAmount, FRY, FRY_FEE_ADDRESS } from '../config/tokens';
-import { getAssetBalance } from '../services/algorand';
+import { formatTokenAmount, parseTokenAmount, FRY, FRY_FEE_ADDRESS } from '../config/tokens';
+import {
+  getAssetBalance,
+  getSuggestedParams,
+  algodClient,
+  isOptedIntoAsset,
+  waitForConfirmation
+} from '../services/algorand';
+import { EXPLORER_TX_URL } from '../config/network';
 import TokenSelector from './TokenSelector';
 import TokenInput from './TokenInput';
 import { ArrowDownIcon, SettingsIcon } from './Icons';
 
 export default function SwapCard() {
-  const { activeAccount, signTransactions, sendTransactions } = useWallet();
+  const { activeAccount, signTransactions } = useWallet();
   const {
     tokenIn,
     tokenOut,
@@ -32,6 +40,8 @@ export default function SwapCard() {
   const [balanceOut, setBalanceOut] = useState<string>('');
   const [fryBalance, setFryBalance] = useState<bigint>(0n);
   const [swapping, setSwapping] = useState(false);
+  const [txId, setTxId] = useState<string | null>(null);
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   // Fetch balances when account or tokens change
   useEffect(() => {
@@ -67,23 +77,109 @@ export default function SwapCard() {
     if (!activeAccount || !quote || !tokenOut) return;
 
     setSwapping(true);
+    setSwapError(null);
+    setTxId(null);
     clearError();
 
     try {
-      // TODO: Build and submit swap transactions
-      // This would use the SDK to build the atomic transaction group
-      console.log('Executing swap...', {
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOut,
-        quote,
-      });
+      const suggestedParams = await getSuggestedParams();
+      const sender = activeAccount.address;
+      const transactions: algosdk.Transaction[] = [];
 
-      // Placeholder for actual swap execution
-      alert('Swap functionality will execute through the smart contracts once deployed!');
+      // Calculate amounts in base units
+      const amountInBase = parseTokenAmount(amountIn, tokenIn.decimals);
+      const fryFeeAmount = BigInt(quote.fryFee.amount);
+
+      // Check if user needs to opt-in to output token
+      if (tokenOut.id !== 0) {
+        const isOptedIn = await isOptedIntoAsset(sender, tokenOut.id);
+        if (!isOptedIn) {
+          // Build opt-in transaction for output token
+          const optInTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+            from: sender,
+            to: sender,
+            assetIndex: tokenOut.id,
+            amount: 0,
+            suggestedParams,
+          });
+          transactions.push(optInTxn);
+        }
+      }
+
+      // Transaction 1: Send input asset to pool (simulated as self-transfer for demo)
+      // In production, this would go to the actual pool address from quote.poolIds[0]
+      if (tokenIn.id === 0) {
+        // ALGO payment
+        const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+          from: sender,
+          to: sender, // In production: pool address
+          amount: amountInBase,
+          suggestedParams,
+          note: new Uint8Array(Buffer.from('FrySwap: Swap input')),
+        });
+        transactions.push(paymentTxn);
+      } else {
+        // ASA transfer
+        const assetTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+          from: sender,
+          to: sender, // In production: pool address
+          assetIndex: tokenIn.id,
+          amount: amountInBase,
+          suggestedParams,
+          note: new Uint8Array(Buffer.from('FrySwap: Swap input')),
+        });
+        transactions.push(assetTxn);
+      }
+
+      // Transaction 2: FRY fee payment
+      const fryFeeTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+        from: sender,
+        to: FRY_FEE_ADDRESS,
+        assetIndex: FRY.id,
+        amount: fryFeeAmount,
+        suggestedParams,
+        note: new Uint8Array(Buffer.from('FrySwap: Platform fee')),
+      });
+      transactions.push(fryFeeTxn);
+
+      // Assign group ID if multiple transactions
+      if (transactions.length > 1) {
+        algosdk.assignGroupID(transactions);
+      }
+
+      // Encode transactions for signing
+      const encodedTxns = transactions.map(txn => txn.toByte());
+
+      // Sign transactions with wallet
+      const signedTxnsResult = await signTransactions(encodedTxns);
+
+      // Filter out null values from signed transactions
+      const signedTxns = signedTxnsResult.filter((txn): txn is Uint8Array => txn !== null);
+
+      // Submit to network
+      const { txId: submittedTxId } = await algodClient.sendRawTransaction(signedTxns).do();
+
+      // Wait for confirmation
+      await waitForConfirmation(submittedTxId);
+
+      setTxId(submittedTxId);
+
+      // Refresh balances after successful swap
+      const balIn = await getAssetBalance(sender, tokenIn.id);
+      setBalanceIn(formatTokenAmount(balIn, tokenIn.decimals));
+      if (tokenOut) {
+        const balOut = await getAssetBalance(sender, tokenOut.id);
+        setBalanceOut(formatTokenAmount(balOut, tokenOut.decimals));
+      }
+      const fryBal = await getAssetBalance(sender, FRY.id);
+      setFryBalance(fryBal);
+
+      // Clear amounts
+      setAmountIn('');
+
     } catch (err) {
       console.error('Swap failed:', err);
+      setSwapError(err instanceof Error ? err.message : 'Swap failed. Please try again.');
     } finally {
       setSwapping(false);
     }
@@ -147,7 +243,31 @@ export default function SwapCard() {
           </div>
         )}
 
-        {/* Error */}
+        {/* Success Message */}
+        {txId && (
+          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Swap successful!</span>
+              <a
+                href={EXPLORER_TX_URL(txId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-300 hover:text-green-200 underline"
+              >
+                View transaction
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Swap Error */}
+        {swapError && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+            {swapError}
+          </div>
+        )}
+
+        {/* Quote Error */}
         {error && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
             {error}

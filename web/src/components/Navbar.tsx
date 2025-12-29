@@ -3,20 +3,21 @@ import { useWallet } from '@txnlab/use-wallet-react';
 import Logo from './Logo';
 
 export default function Navbar() {
-  const { activeAccount, providers } = useWallet();
+  const { activeAccount, activeWallet, wallets } = useWallet();
 
   const handleConnect = async () => {
     // Try Pera first, then Defly
-    const pera = providers?.find((p) => p.metadata.id === 'pera');
-    if (pera) {
-      await pera.connect();
+    const peraWallet = wallets?.find((w) => w.id === 'pera');
+    if (peraWallet) {
+      await peraWallet.connect();
+    } else if (wallets && wallets.length > 0) {
+      await wallets[0].connect();
     }
   };
 
   const handleDisconnect = async () => {
-    const activeProvider = providers?.find((p) => p.isActive);
-    if (activeProvider) {
-      await activeProvider.disconnect();
+    if (activeWallet) {
+      await activeWallet.disconnect();
     }
   };
 
