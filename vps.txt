@@ -1,0 +1,888 @@
+================================================================================
+                        FRYSWAP VPS DEPLOYMENT GUIDE
+================================================================================
+
+This guide provides complete step-by-step instructions for deploying FrySwap
+on a Virtual Private Server (VPS). No additional research required.
+
+================================================================================
+                            SYSTEM REQUIREMENTS
+================================================================================
+
+MINIMUM SPECIFICATIONS (Development/Testing):
+---------------------------------------------
+- CPU:     1 vCPU / 1 Core
+- RAM:     1 GB
+- Storage: 20 GB SSD
+- OS:      Ubuntu 22.04 LTS / Debian 12
+- Network: 100 Mbps, static IP recommended
+
+RECOMMENDED SPECIFICATIONS (Production):
+----------------------------------------
+- CPU:     2+ vCPU / 2+ Cores
+- RAM:     4 GB (8 GB preferred)
+- Storage: 40 GB SSD (NVMe preferred)
+- OS:      Ubuntu 24.04 LTS / Debian 12
+- Network: 1 Gbps, static IP, DDoS protection
+
+PREFERRED SPECIFICATIONS (High Traffic):
+----------------------------------------
+- CPU:     4+ vCPU / 4+ Cores
+- RAM:     8-16 GB
+- Storage: 80 GB NVMe SSD
+- OS:      Ubuntu 24.04 LTS
+- Network: 1 Gbps+, static IP, DDoS protection, CDN
+
+RECOMMENDED VPS PROVIDERS:
+--------------------------
+- Hetzner (Best value, EU/US datacenters)
+- DigitalOcean (Easy setup, good documentation)
+- Vultr (Global presence, hourly billing)
+- Linode/Akamai (Reliable, good support)
+- AWS Lightsail (If you need AWS ecosystem)
+- OVH (Budget-friendly, EU focus)
+
+
+================================================================================
+                         PART 1: INITIAL SERVER SETUP
+================================================================================
+
+After you receive your VPS login credentials, connect via SSH:
+
+    ssh root@YOUR_SERVER_IP
+
+--------------------------------------------------------------------------------
+STEP 1.1: Update System Packages
+--------------------------------------------------------------------------------
+
+    apt update && apt upgrade -y
+
+--------------------------------------------------------------------------------
+STEP 1.2: Set Timezone
+--------------------------------------------------------------------------------
+
+    timedatectl set-timezone UTC
+
+--------------------------------------------------------------------------------
+STEP 1.3: Create a Non-Root User (Security Best Practice)
+--------------------------------------------------------------------------------
+
+    adduser fryswap
+    usermod -aG sudo fryswap
+
+Switch to the new user:
+
+    su - fryswap
+
+From now on, run commands as this user (use 'sudo' when needed).
+
+--------------------------------------------------------------------------------
+STEP 1.4: Configure SSH Security (Optional but Recommended)
+--------------------------------------------------------------------------------
+
+Edit SSH config:
+
+    sudo nano /etc/ssh/sshd_config
+
+Change these settings:
+
+    Port 2222                    # Change from default 22
+    PermitRootLogin no           # Disable root login
+    PasswordAuthentication no    # After setting up SSH keys
+
+Restart SSH:
+
+    sudo systemctl restart sshd
+
+NOTE: Before disabling password auth, ensure you've added your SSH key:
+
+    mkdir -p ~/.ssh
+    echo "YOUR_PUBLIC_SSH_KEY" >> ~/.ssh/authorized_keys
+    chmod 700 ~/.ssh
+    chmod 600 ~/.ssh/authorized_keys
+
+
+================================================================================
+                         PART 2: INSTALL DEPENDENCIES
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 2.1: Install Essential Packages
+--------------------------------------------------------------------------------
+
+    sudo apt install -y build-essential curl wget git unzip software-properties-common
+
+--------------------------------------------------------------------------------
+STEP 2.2: Install Python 3.12
+--------------------------------------------------------------------------------
+
+    sudo add-apt-repository ppa:deadsnakes/ppa -y
+    sudo apt update
+    sudo apt install -y python3.12 python3.12-venv python3.12-dev python3-pip
+
+Verify installation:
+
+    python3.12 --version
+
+Expected output: Python 3.12.x
+
+--------------------------------------------------------------------------------
+STEP 2.3: Install Node.js 20 LTS
+--------------------------------------------------------------------------------
+
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+
+Verify installation:
+
+    node --version
+    npm --version
+
+Expected output: v20.x.x and 10.x.x
+
+--------------------------------------------------------------------------------
+STEP 2.4: Install PM2 (Process Manager)
+--------------------------------------------------------------------------------
+
+    sudo npm install -g pm2
+
+--------------------------------------------------------------------------------
+STEP 2.5: Install Nginx (Web Server/Reverse Proxy)
+--------------------------------------------------------------------------------
+
+    sudo apt install -y nginx
+
+--------------------------------------------------------------------------------
+STEP 2.6: Install Certbot (SSL Certificates)
+--------------------------------------------------------------------------------
+
+    sudo apt install -y certbot python3-certbot-nginx
+
+
+================================================================================
+                         PART 3: FIREWALL CONFIGURATION
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 3.1: Configure UFW Firewall
+--------------------------------------------------------------------------------
+
+    sudo ufw default deny incoming
+    sudo ufw default allow outgoing
+    sudo ufw allow ssh
+    sudo ufw allow 2222/tcp       # If you changed SSH port
+    sudo ufw allow 80/tcp         # HTTP
+    sudo ufw allow 443/tcp        # HTTPS
+    sudo ufw enable
+
+Check status:
+
+    sudo ufw status
+
+
+================================================================================
+                         PART 4: DEPLOY FRYSWAP
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 4.1: Clone the Repository
+--------------------------------------------------------------------------------
+
+    cd ~
+    git clone https://github.com/Fry-Foundation/fry-swap.git
+    cd fry-swap
+
+--------------------------------------------------------------------------------
+STEP 4.2: Deploy Smart Contracts (If Not Already Deployed)
+--------------------------------------------------------------------------------
+
+If you're deploying contracts from the server:
+
+    # Install PowerShell Core (for the deployment script)
+    sudo apt install -y wget apt-transport-https
+    wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
+    sudo dpkg -i packages-microsoft-prod.deb
+    sudo apt update
+    sudo apt install -y powershell
+
+    # Run deployment wizard
+    pwsh ./deploy-guide.ps1
+
+ALTERNATIVELY, if contracts are already deployed, create the config manually:
+
+    mkdir -p contracts/build
+    cat > contracts/build/deployment.json << 'EOF'
+    {
+      "network": "mainnet",
+      "contracts": {
+        "factory": { "app_id": YOUR_FACTORY_APP_ID },
+        "router": { "app_id": YOUR_ROUTER_APP_ID }
+      }
+    }
+    EOF
+
+--------------------------------------------------------------------------------
+STEP 4.3: Install Node.js Dependencies
+--------------------------------------------------------------------------------
+
+    npm install
+
+--------------------------------------------------------------------------------
+STEP 4.4: Configure API Environment
+--------------------------------------------------------------------------------
+
+    cat > api/.env << 'EOF'
+    # FrySwap API Production Configuration
+
+    # Server
+    PORT=3000
+    NODE_ENV=production
+
+    # Algorand Network
+    ALGORAND_NETWORK=mainnet
+    ALGOD_SERVER=https://mainnet-api.4160.nodely.dev
+    ALGOD_PORT=443
+    ALGOD_TOKEN=
+    INDEXER_SERVER=https://mainnet-idx.4160.nodely.dev
+    INDEXER_PORT=443
+    INDEXER_TOKEN=
+
+    # Contract IDs (replace with your deployed contract IDs)
+    FACTORY_APP_ID=0
+    ROUTER_APP_ID=0
+
+    # CORS (replace with your domain)
+    CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+    # Cache
+    CACHE_TTL=10
+
+    # FRY Fee System
+    FRY_TOKEN_ID=2485314946
+    FRY_FEE_ADDRESS=E2F2LT2INE75DBOYHQXTCTOP2PAP5MHAXQRXTTCCXFKHQTVG36DJONBQZE
+    FRY_FEE_BPS=30
+    EOF
+
+IMPORTANT: Edit the file and replace:
+- FACTORY_APP_ID with your actual Factory contract ID
+- ROUTER_APP_ID with your actual Router contract ID
+- CORS_ORIGINS with your actual domain(s)
+
+    nano api/.env
+
+--------------------------------------------------------------------------------
+STEP 4.5: Configure Web Environment
+--------------------------------------------------------------------------------
+
+    cat > web/.env.local << 'EOF'
+    # FrySwap Web Production Configuration
+    VITE_API_URL=https://yourdomain.com/api/v1
+    VITE_ALGORAND_NETWORK=mainnet
+    EOF
+
+IMPORTANT: Replace 'yourdomain.com' with your actual domain:
+
+    nano web/.env.local
+
+--------------------------------------------------------------------------------
+STEP 4.6: Build the SDK
+--------------------------------------------------------------------------------
+
+    cd sdk
+    npm run build
+    cd ..
+
+--------------------------------------------------------------------------------
+STEP 4.7: Build the Web Frontend
+--------------------------------------------------------------------------------
+
+    cd web
+    npm run build
+    cd ..
+
+The built files will be in: ~/fry-swap/web/dist/
+
+
+================================================================================
+                         PART 5: CONFIGURE PM2 (PROCESS MANAGER)
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 5.1: Create PM2 Ecosystem File
+--------------------------------------------------------------------------------
+
+    cat > ecosystem.config.js << 'EOF'
+    module.exports = {
+      apps: [
+        {
+          name: 'fryswap-api',
+          cwd: './api',
+          script: 'npm',
+          args: 'run start',
+          instances: 'max',
+          exec_mode: 'cluster',
+          autorestart: true,
+          watch: false,
+          max_memory_restart: '500M',
+          env: {
+            NODE_ENV: 'production',
+            PORT: 3000
+          },
+          error_file: './logs/api-error.log',
+          out_file: './logs/api-out.log',
+          log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+        }
+      ]
+    };
+    EOF
+
+--------------------------------------------------------------------------------
+STEP 5.2: Create Logs Directory
+--------------------------------------------------------------------------------
+
+    mkdir -p logs
+
+--------------------------------------------------------------------------------
+STEP 5.3: Start the API with PM2
+--------------------------------------------------------------------------------
+
+    pm2 start ecosystem.config.js
+
+--------------------------------------------------------------------------------
+STEP 5.4: Configure PM2 to Start on Boot
+--------------------------------------------------------------------------------
+
+    pm2 startup
+    # Follow the instructions printed by this command
+
+    pm2 save
+
+--------------------------------------------------------------------------------
+STEP 5.5: Useful PM2 Commands
+--------------------------------------------------------------------------------
+
+    pm2 status              # View all processes
+    pm2 logs fryswap-api    # View API logs
+    pm2 restart fryswap-api # Restart API
+    pm2 stop fryswap-api    # Stop API
+    pm2 delete fryswap-api  # Remove from PM2
+    pm2 monit               # Real-time monitoring
+
+
+================================================================================
+                         PART 6: CONFIGURE NGINX
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 6.1: Create Nginx Configuration
+--------------------------------------------------------------------------------
+
+    sudo nano /etc/nginx/sites-available/fryswap
+
+Paste the following (replace 'yourdomain.com' with your actual domain):
+
+    # FrySwap Nginx Configuration
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=general_limit:10m rate=30r/s;
+
+    # Upstream for API load balancing
+    upstream fryswap_api {
+        least_conn;
+        server 127.0.0.1:3000;
+        keepalive 32;
+    }
+
+    # Redirect HTTP to HTTPS
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name yourdomain.com www.yourdomain.com;
+
+        location /.well-known/acme-challenge/ {
+            root /var/www/html;
+        }
+
+        location / {
+            return 301 https://$server_name$request_uri;
+        }
+    }
+
+    # Main HTTPS server
+    server {
+        listen 443 ssl http2;
+        listen [::]:443 ssl http2;
+        server_name yourdomain.com www.yourdomain.com;
+
+        # SSL certificates (will be configured by Certbot)
+        # ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+        # ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+        # SSL configuration
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 1d;
+        ssl_session_tickets off;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://mainnet-api.4160.nodely.dev https://mainnet-idx.4160.nodely.dev wss:; font-src 'self';" always;
+
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml;
+
+        # Root for static files
+        root /home/fryswap/fry-swap/web/dist;
+        index index.html;
+
+        # API proxy
+        location /api/ {
+            limit_req zone=api_limit burst=20 nodelay;
+
+            proxy_pass http://fryswap_api;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+        }
+
+        # Health check endpoint (no rate limit)
+        location /api/v1/health {
+            proxy_pass http://fryswap_api;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        # Static file caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            access_log off;
+        }
+
+        # SPA routing - serve index.html for all routes
+        location / {
+            limit_req zone=general_limit burst=50 nodelay;
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Deny access to hidden files
+        location ~ /\. {
+            deny all;
+        }
+    }
+
+--------------------------------------------------------------------------------
+STEP 6.2: Enable the Site
+--------------------------------------------------------------------------------
+
+    sudo ln -s /etc/nginx/sites-available/fryswap /etc/nginx/sites-enabled/
+    sudo rm -f /etc/nginx/sites-enabled/default
+
+--------------------------------------------------------------------------------
+STEP 6.3: Test Nginx Configuration
+--------------------------------------------------------------------------------
+
+    sudo nginx -t
+
+Expected output: "syntax is ok" and "test is successful"
+
+--------------------------------------------------------------------------------
+STEP 6.4: Restart Nginx
+--------------------------------------------------------------------------------
+
+    sudo systemctl restart nginx
+    sudo systemctl enable nginx
+
+
+================================================================================
+                         PART 7: SSL CERTIFICATE (HTTPS)
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 7.1: Obtain SSL Certificate with Certbot
+--------------------------------------------------------------------------------
+
+IMPORTANT: Your domain's DNS must point to this server's IP address first!
+
+    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+
+Follow the prompts:
+1. Enter your email address
+2. Agree to terms of service
+3. Choose whether to redirect HTTP to HTTPS (recommended: Yes)
+
+--------------------------------------------------------------------------------
+STEP 7.2: Verify Auto-Renewal
+--------------------------------------------------------------------------------
+
+    sudo certbot renew --dry-run
+
+--------------------------------------------------------------------------------
+STEP 7.3: Set Up Auto-Renewal Cron Job (Usually automatic, but verify)
+--------------------------------------------------------------------------------
+
+    sudo systemctl status certbot.timer
+
+If not active:
+
+    sudo systemctl enable certbot.timer
+    sudo systemctl start certbot.timer
+
+
+================================================================================
+                         PART 8: MONITORING & MAINTENANCE
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 8.1: Set Up Log Rotation
+--------------------------------------------------------------------------------
+
+    sudo nano /etc/logrotate.d/fryswap
+
+Add the following:
+
+    /home/fryswap/fry-swap/logs/*.log {
+        daily
+        missingok
+        rotate 14
+        compress
+        delaycompress
+        notifempty
+        create 0640 fryswap fryswap
+        sharedscripts
+        postrotate
+            pm2 reloadLogs
+        endscript
+    }
+
+--------------------------------------------------------------------------------
+STEP 8.2: Basic Monitoring Script
+--------------------------------------------------------------------------------
+
+    cat > ~/monitor.sh << 'EOF'
+    #!/bin/bash
+    # FrySwap Basic Monitoring Script
+
+    echo "=== FrySwap Server Status ==="
+    echo ""
+    echo "--- System Resources ---"
+    echo "CPU Load: $(uptime | awk -F'load average:' '{print $2}')"
+    echo "Memory: $(free -h | awk '/^Mem:/ {print $3 "/" $2}')"
+    echo "Disk: $(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 " used)"}')"
+    echo ""
+    echo "--- Services Status ---"
+    echo "Nginx: $(systemctl is-active nginx)"
+    echo "PM2 API: $(pm2 jlist | grep -o '"status":"[^"]*"' | head -1)"
+    echo ""
+    echo "--- API Health Check ---"
+    curl -s http://localhost:3000/api/v1/health | head -c 100
+    echo ""
+    echo ""
+    echo "--- Recent Errors (last 10) ---"
+    tail -10 /home/fryswap/fry-swap/logs/api-error.log 2>/dev/null || echo "No errors logged"
+    EOF
+
+    chmod +x ~/monitor.sh
+
+Run it with:
+
+    ~/monitor.sh
+
+--------------------------------------------------------------------------------
+STEP 8.3: Set Up Health Check Cron
+--------------------------------------------------------------------------------
+
+    crontab -e
+
+Add these lines:
+
+    # Health check every 5 minutes
+    */5 * * * * curl -sf http://localhost:3000/api/v1/health > /dev/null || pm2 restart fryswap-api
+
+    # Disk space alert
+    0 * * * * [ $(df / | awk 'NR==2 {print int($5)}') -gt 80 ] && echo "Disk space warning" | mail -s "FrySwap Alert" your@email.com
+
+--------------------------------------------------------------------------------
+STEP 8.4: Useful Monitoring Commands
+--------------------------------------------------------------------------------
+
+    # View real-time logs
+    pm2 logs fryswap-api --lines 100
+
+    # View Nginx access logs
+    sudo tail -f /var/log/nginx/access.log
+
+    # View Nginx error logs
+    sudo tail -f /var/log/nginx/error.log
+
+    # Check disk usage
+    df -h
+
+    # Check memory usage
+    free -h
+
+    # Check CPU usage
+    htop  # Install with: sudo apt install htop
+
+    # Check network connections
+    ss -tuln
+
+    # Check process status
+    pm2 status
+
+
+================================================================================
+                         PART 9: UPDATES & MAINTENANCE
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 9.1: Updating FrySwap
+--------------------------------------------------------------------------------
+
+    cd ~/fry-swap
+
+    # Pull latest changes
+    git pull origin main
+
+    # Install any new dependencies
+    npm install
+
+    # Rebuild SDK
+    cd sdk && npm run build && cd ..
+
+    # Rebuild Web frontend
+    cd web && npm run build && cd ..
+
+    # Restart API
+    pm2 restart fryswap-api
+
+    # Clear Nginx cache (if using)
+    sudo systemctl reload nginx
+
+--------------------------------------------------------------------------------
+STEP 9.2: System Updates
+--------------------------------------------------------------------------------
+
+    # Update system packages (do this weekly)
+    sudo apt update && sudo apt upgrade -y
+
+    # Update Node.js (when new LTS is available)
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+
+    # Update PM2
+    sudo npm install -g pm2@latest
+    pm2 update
+
+--------------------------------------------------------------------------------
+STEP 9.3: Backup Strategy
+--------------------------------------------------------------------------------
+
+Create backup script:
+
+    cat > ~/backup.sh << 'EOF'
+    #!/bin/bash
+    # FrySwap Backup Script
+
+    BACKUP_DIR="/home/fryswap/backups"
+    DATE=$(date +%Y%m%d_%H%M%S)
+
+    mkdir -p $BACKUP_DIR
+
+    # Backup configuration files
+    tar -czf $BACKUP_DIR/config_$DATE.tar.gz \
+        ~/fry-swap/api/.env \
+        ~/fry-swap/web/.env.local \
+        ~/fry-swap/contracts/build/deployment.json \
+        /etc/nginx/sites-available/fryswap
+
+    # Keep only last 7 days of backups
+    find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+
+    echo "Backup completed: $BACKUP_DIR/config_$DATE.tar.gz"
+    EOF
+
+    chmod +x ~/backup.sh
+
+Add to crontab:
+
+    # Daily backup at 3 AM
+    0 3 * * * /home/fryswap/backup.sh
+
+
+================================================================================
+                         PART 10: SECURITY HARDENING
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 10.1: Install Fail2Ban (Brute Force Protection)
+--------------------------------------------------------------------------------
+
+    sudo apt install -y fail2ban
+
+    sudo cat > /etc/fail2ban/jail.local << 'EOF'
+    [DEFAULT]
+    bantime = 3600
+    findtime = 600
+    maxretry = 5
+
+    [sshd]
+    enabled = true
+    port = ssh,2222
+
+    [nginx-http-auth]
+    enabled = true
+
+    [nginx-limit-req]
+    enabled = true
+    EOF
+
+    sudo systemctl enable fail2ban
+    sudo systemctl start fail2ban
+
+--------------------------------------------------------------------------------
+STEP 10.2: Install and Configure ModSecurity (Optional WAF)
+--------------------------------------------------------------------------------
+
+    sudo apt install -y libnginx-mod-http-modsecurity
+
+    # Enable ModSecurity
+    sudo sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' /etc/modsecurity/modsecurity.conf
+
+    sudo systemctl restart nginx
+
+--------------------------------------------------------------------------------
+STEP 10.3: Automatic Security Updates
+--------------------------------------------------------------------------------
+
+    sudo apt install -y unattended-upgrades
+    sudo dpkg-reconfigure -plow unattended-upgrades
+
+--------------------------------------------------------------------------------
+STEP 10.4: Disable Unused Services
+--------------------------------------------------------------------------------
+
+    # List all services
+    sudo systemctl list-unit-files --type=service
+
+    # Disable unnecessary services (example)
+    sudo systemctl disable bluetooth
+    sudo systemctl disable cups
+
+
+================================================================================
+                         TROUBLESHOOTING
+================================================================================
+
+PROBLEM: API not responding
+SOLUTION:
+    pm2 logs fryswap-api --lines 50
+    pm2 restart fryswap-api
+
+PROBLEM: 502 Bad Gateway
+SOLUTION:
+    # Check if API is running
+    pm2 status
+
+    # Check port binding
+    ss -tuln | grep 3000
+
+    # Check Nginx error logs
+    sudo tail -50 /var/log/nginx/error.log
+
+PROBLEM: SSL certificate issues
+SOLUTION:
+    # Check certificate status
+    sudo certbot certificates
+
+    # Force renewal
+    sudo certbot renew --force-renewal
+
+PROBLEM: High memory usage
+SOLUTION:
+    # Check memory consumers
+    ps aux --sort=-%mem | head -10
+
+    # Restart services
+    pm2 restart all
+    sudo systemctl restart nginx
+
+PROBLEM: Disk space full
+SOLUTION:
+    # Find large files
+    sudo du -h / | sort -rh | head -20
+
+    # Clean logs
+    sudo journalctl --vacuum-time=7d
+    pm2 flush
+
+    # Clean apt cache
+    sudo apt clean
+
+PROBLEM: Can't connect to Algorand node
+SOLUTION:
+    # Test connection
+    curl -s https://mainnet-api.4160.nodely.dev/health
+
+    # Check DNS
+    nslookup mainnet-api.4160.nodely.dev
+
+
+================================================================================
+                         QUICK REFERENCE COMMANDS
+================================================================================
+
+# Start everything
+pm2 start ecosystem.config.js
+sudo systemctl start nginx
+
+# Stop everything
+pm2 stop all
+sudo systemctl stop nginx
+
+# Restart everything
+pm2 restart all
+sudo systemctl restart nginx
+
+# View logs
+pm2 logs fryswap-api
+sudo tail -f /var/log/nginx/error.log
+
+# Check status
+pm2 status
+sudo systemctl status nginx
+curl -s http://localhost:3000/api/v1/health
+
+
+================================================================================
+                         CONTACT & SUPPORT
+================================================================================
+
+For issues with this deployment guide:
+- GitHub: https://github.com/Fry-Foundation/fry-swap/issues
+
+For Algorand-related questions:
+- Algorand Discord: https://discord.gg/algorand
+- Algorand Forum: https://forum.algorand.org
+
+================================================================================
+                         END OF GUIDE
+================================================================================
