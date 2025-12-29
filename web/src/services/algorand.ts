@@ -3,7 +3,7 @@
  */
 
 import algosdk from 'algosdk';
-import { NETWORK_CONFIG, MIN_TXN_FEE } from '../config/network';
+import { NETWORK_CONFIG } from '../config/network';
 
 // Initialize Algod client
 export const algodClient = new algosdk.Algodv2(
@@ -92,8 +92,8 @@ export async function buildOptInTxn(
   const params = await getSuggestedParams();
 
   return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-    sender: address,
-    receiver: address,
+    from: address,
+    to: address,
     assetIndex: assetId,
     amount: 0,
     suggestedParams: params,
@@ -104,15 +104,15 @@ export async function buildOptInTxn(
  * Build payment transaction (ALGO)
  */
 export async function buildPaymentTxn(
-  sender: string,
-  receiver: string,
+  from: string,
+  to: string,
   amount: bigint
 ): Promise<algosdk.Transaction> {
   const params = await getSuggestedParams();
 
   return algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    sender,
-    receiver,
+    from,
+    to,
     amount,
     suggestedParams: params,
   });
@@ -122,20 +122,20 @@ export async function buildPaymentTxn(
  * Build asset transfer transaction
  */
 export async function buildAssetTransferTxn(
-  sender: string,
-  receiver: string,
+  from: string,
+  to: string,
   assetId: number,
   amount: bigint
 ): Promise<algosdk.Transaction> {
   const params = await getSuggestedParams();
 
   if (assetId === 0) {
-    return buildPaymentTxn(sender, receiver, amount);
+    return buildPaymentTxn(from, to, amount);
   }
 
   return algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-    sender,
-    receiver,
+    from,
+    to,
     assetIndex: assetId,
     amount,
     suggestedParams: params,
