@@ -177,6 +177,12 @@ def bootstrap(
         The LP token asset ID created for this pool
     """
     return Seq(
+        # Only the account that created this pool app may bootstrap it. Without
+        # this check, anyone could race the real deployer's bootstrap call (it
+        # can only ever succeed once) between pool-app creation and the
+        # deployer's own bootstrap transaction, permanently binding the pool
+        # to attacker-chosen assets/LP token and bricking the intended pool.
+        Assert(Txn.sender() == Global.creator_address()),
         # Verify pool hasn't been initialized
         Assert(App.globalGet(GlobalState.ASSET_A_ID) == Int(0)),
         # Ensure asset_a < asset_b for consistent ordering (ALGO=0 always first if included)
